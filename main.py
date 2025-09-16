@@ -17,7 +17,7 @@ def handle_message(message):
         'user': str(message.from_user.id)
     }
     
-    response = requests.post('https://api.shai.pro/v1/chat-messages', 
+    response = requests.post('https://api.shai.pro/v1/apps/app-LqQKmr2WcmFUTAjZk2adM46j/chat-messages', 
                            json=data, headers=headers)
     if response.status_code == 200:
         bot.reply_to(message, response.json()['answer'])
