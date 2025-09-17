@@ -12,10 +12,7 @@ def handle_message(message):
     # Дублируем сообщение пользователя админам
     try:
         user_name = message.from_user.first_name
-        if message.from_user.username:
-            user_name += f" (@{message.from_user.username})"
-        
-        admin_msg = f"📩 Входящее от {user_name}:\n{message.text}"
+        admin_msg = f"Входящее от {user_name}: {message.text}"
         bot.send_message(ADMIN_GROUP_ID, admin_msg)
     except Exception as e:
         logging.error(f"Ошибка отправки админам: {e}")
@@ -35,29 +32,37 @@ def handle_message(message):
     }
     
     try:
-        # Используем найденный API endpoint
         response = requests.post('https://hackathon.shai.pro/api/v1/apps/ODwjlCdBp4b1Bzsh/chat-messages', 
-                               json=data, headers=headers)
+                               json=data, headers=headers, timeout=30)
         
-        logging.info(f"Status: {response.status_code}")
+        # Подробная диагностика
+        logging.info(f"Status Code: {response.status_code}")
+        logging.info(f"Response Headers: {response.headers}")
+        logging.info(f"Response Text: {response.text}")
         
         if response.status_code == 200:
             result = response.json()
-            answer = result.get('answer', 'Ответ получен')
-            
-            # Отвечаем пользователю
+            answer = result.get('answer', str(result))
             bot.reply_to(message, answer)
             
             # Дублируем ответ админам
             try:
-                bot.send_message(ADMIN_GROUP_ID, f"🤖 Ответ для {user_name}:\n{answer}")
+                bot.send_message(ADMIN_GROUP_ID, f"Ответ: {answer}")
             except:
                 pass
         else:
-            bot.reply_to(message, "Извините, произошла ошибка")
+            error_msg = f"Ошибка API: {response.status_code}"
+            bot.reply_to(message, error_msg)
+            
+            # Отправляем детали ошибки админам
+            try:
+                bot.send_message(ADMIN_GROUP_ID, f"Ошибка API: {response.status_code}\n{response.text}")
+            except:
+                pass
             
     except Exception as e:
-        logging.error(f"Ошибка API: {e}")
-        bot.reply_to(message, "Техническая ошибка")
+        logging.error(f"Исключение: {e}")
+        bot.reply_to(message, f"Техническая ошибка: {str(e)}")
 
+print("Бот запускается...")
 bot.polling()
