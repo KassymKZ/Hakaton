@@ -95,11 +95,12 @@ def send_to_shai_pro(text, user, chat):
     }
     
     data = {
-        'inputs': {},
-        'query': text,
-        'response_mode': 'blocking',
-        'user': str(user.id)
-    }
+    'inputs': {},
+    'query': text,
+    'response_mode': 'blocking',
+    'user': str(user.id),
+    'conversation_id': f"telegram_{chat.id}"  # Добавьте эту строку
+}
     
     try:
         response = requests.post('https://hackathon.shai.pro/v1/chat-messages', 
