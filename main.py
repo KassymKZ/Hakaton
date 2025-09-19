@@ -6,7 +6,6 @@ import telebot
 from telebot import types
 import logging
 from datetime import datetime
-import json
 
 # Настройка логирования
 logging.basicConfig(
@@ -21,7 +20,7 @@ ADMIN_IDS = [824360574]
 # Хранение состояний пользователей
 user_states = {}
 admin_states = {}
-temp_profiles = {}  # Временное хранение профилей
+temp_profiles = {}
 
 class UserState:
     LANGUAGE = "language"
@@ -43,7 +42,6 @@ class AdminState:
 # Подключение к базе данных
 def get_db_connection():
     try:
-        # Проверяем наличие переменных окружения
         db_config = {
             'host': os.environ.get('PGHOST'),
             'port': os.environ.get('PGPORT', 5432),
@@ -59,10 +57,8 @@ def get_db_connection():
         return conn
     except Exception as e:
         logging.error(f"Database connection error: {e}")
-        logging.error(f"DB config: {db_config}")
         return None
 
-# Инициализация базы данных
 def init_database():
     logging.info("Initializing database...")
     conn = get_db_connection()
@@ -70,7 +66,6 @@ def init_database():
         try:
             cursor = conn.cursor()
             
-            # Создание таблицы студентов
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS students (
                     id SERIAL PRIMARY KEY,
@@ -92,7 +87,6 @@ def init_database():
                 )
             ''')
             
-            # Создание таблицы диалогов
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS conversations (
                     id SERIAL PRIMARY KEY,
@@ -101,18 +95,6 @@ def init_database():
                     answer TEXT,
                     category VARCHAR(50),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # Создание таблицы сообщений админов
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS admin_messages (
-                    id SERIAL PRIMARY KEY,
-                    admin_id BIGINT,
-                    target_user_id BIGINT,
-                    message_text TEXT,
-                    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    delivered BOOLEAN DEFAULT FALSE
                 )
             ''')
             
@@ -129,7 +111,6 @@ def init_database():
         logging.error("Could not initialize database - no connection")
         return False
 
-# Функции для работы с базой данных
 def save_student_profile(profile_data):
     logging.info(f"Saving profile for user {profile_data.get('telegram_id')}")
     conn = get_db_connection()
@@ -406,12 +387,11 @@ def get_text(language, key):
     
     return texts.get(key, {}).get(language, texts.get(key, {}).get('en', ''))
 
-# ОСНОВНЫЕ КОМАНДЫ
+# КОМАНДЫ
 @bot.message_handler(commands=['start'])
 def start_command(message):
     logging.info(f"Start command from user {message.from_user.id}")
     
-    # Проверяем, есть ли уже профиль в БД
     student = get_student_by_id(message.from_user.id)
     
     if student and student.get('profile_completed'):
@@ -423,7 +403,6 @@ def start_command(message):
         logging.info(f"Starting registration for user {message.from_user.id}")
         user_states[message.from_user.id] = UserState.LANGUAGE
         
-        # Инициализируем временный профиль
         temp_profiles[message.from_user.id] = {
             'telegram_id': message.from_user.id,
             'telegram_username': message.from_user.username,
@@ -443,7 +422,6 @@ def admin_command(message):
     
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(types.InlineKeyboardButton("📊 Статистика", callback_data="admin_stats"))
-    markup.add(types.InlineKeyboardButton("👥 Список студентов", callback_data="admin_list"))
     
     bot.reply_to(message, "🛠️ Админская панель:", reply_markup=markup)
 
@@ -456,7 +434,6 @@ def handle_language_selection(call):
     language = call.data.split('_')[1]
     user_id = call.from_user.id
     
-    # Обновляем временный профиль
     if user_id not in temp_profiles:
         temp_profiles[user_id] = {
             'telegram_id': user_id,
@@ -478,7 +455,6 @@ def handle_language_selection(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('gender_'))
 def handle_gender_selection(call):
-    logging.info(f"Gender selection: {call.data} from user {call.from_user.id}")
     bot.answer_callback_query(call.id)
     
     gender = call.data.split('_')[1]
@@ -499,7 +475,6 @@ def handle_gender_selection(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('birthplace_'))
 def handle_birthplace_selection(call):
-    logging.info(f"Birthplace selection: {call.data} from user {call.from_user.id}")
     bot.answer_callback_query(call.id)
     
     birthplace = call.data.split('_')[1]
@@ -520,7 +495,6 @@ def handle_birthplace_selection(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('family_'))
 def handle_family_selection(call):
-    logging.info(f"Family selection: {call.data} from user {call.from_user.id}")
     bot.answer_callback_query(call.id)
     
     family = call.data.split('_')[1]
@@ -541,7 +515,6 @@ def handle_family_selection(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('course_'))
 def handle_course_selection(call):
-    logging.info(f"Course selection: {call.data} from user {call.from_user.id}")
     bot.answer_callback_query(call.id)
     
     course = call.data.split('_')[1]
@@ -560,7 +533,6 @@ def handle_course_selection(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('housing_'))
 def handle_housing_selection(call):
-    logging.info(f"Housing selection: {call.data} from user {call.from_user.id}")
     bot.answer_callback_query(call.id)
     
     housing = call.data.split('_')[1]
@@ -569,12 +541,9 @@ def handle_housing_selection(call):
     temp_profiles[user_id]['user_housing_type'] = housing
     temp_profiles[user_id]['profile_completed'] = True
     
-    # Сохраняем в БД
     if save_student_profile(temp_profiles[user_id]):
         logging.info(f"Profile saved for user {user_id}")
         send_profile_to_admin(temp_profiles[user_id])
-    else:
-        logging.error(f"Failed to save profile for user {user_id}")
     
     user_states[user_id] = UserState.COMPLETED
     
@@ -609,7 +578,6 @@ def handle_category_selection(call):
     
     parts = call.data.split('_')
     category = parts[0]
-    language = parts[1] if len(parts) > 1 else 'ru'
     
     category_messages = {
         "finance": "У меня финансовые проблемы с деньгами и стипендией",
@@ -638,6 +606,14 @@ def handle_category_selection(call):
         
         send_to_shai_pro(category_messages[category], call.from_user, call.message.chat, category)
 
+@bot.callback_query_handler(func=lambda call: call.data == "admin_stats")
+def handle_admin_stats(call):
+    if call.from_user.id not in ADMIN_IDS:
+        return
+    
+    bot.answer_callback_query(call.id)
+    show_statistics(call.message)
+
 # ОБРАБОТКА ТЕКСТОВЫХ СООБЩЕНИЙ
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
@@ -646,7 +622,6 @@ def handle_message(message):
     logging.info(f"Message from user {user_id}: '{message.text}'")
     logging.info(f"User state: {user_states.get(user_id, 'None')}")
     
-    # Проверяем состояние анкетирования
     if user_id in user_states:
         state = user_states[user_id]
         
@@ -657,7 +632,6 @@ def handle_message(message):
                 if 16 <= age <= 35:
                     logging.info(f"Valid age {age} for user {user_id}")
                     
-                    # Обновляем временный профиль
                     if user_id in temp_profiles:
                         temp_profiles[user_id]['user_age'] = age
                         user_states[user_id] = UserState.GENDER
@@ -666,13 +640,11 @@ def handle_message(message):
                         markup = create_gender_menu(language)
                         bot.reply_to(message, get_text(language, 'gender_request'), reply_markup=markup)
                     else:
-                        logging.error(f"No temp profile for user {user_id}")
                         bot.reply_to(message, "Ошибка. Начните заново с /start")
                 else:
                     language = temp_profiles.get(user_id, {}).get('user_language', 'ru')
                     bot.reply_to(message, get_text(language, 'age_invalid'))
             except ValueError:
-                logging.warning(f"Invalid age format from user {user_id}: {message.text}")
                 language = temp_profiles.get(user_id, {}).get('user_language', 'ru')
                 bot.reply_to(message, get_text(language, 'age_invalid'))
                 
@@ -687,23 +659,17 @@ def handle_message(message):
                 markup = create_housing_menu(language)
                 bot.reply_to(message, get_text(language, 'housing_request'), reply_markup=markup)
             else:
-                logging.error(f"No temp profile for user {user_id}")
                 bot.reply_to(message, "Ошибка. Начните заново с /start")
         
         else:
-            logging.info(f"Unexpected text message in state {state}")
             bot.reply_to(message, "Пожалуйста, используйте кнопки для выбора")
     
     else:
-        # Обычное сообщение от зарегистрированного пользователя
-        logging.info(f"Regular message from user {user_id}")
         student = get_student_by_id(user_id)
         
         if student and student.get('profile_completed'):
-            logging.info(f"Sending message to shai.pro from completed user {user_id}")
             send_to_shai_pro(message.text, message.from_user, message.chat)
         else:
-            logging.info(f"User {user_id} not registered, starting registration")
             start_command(message)
 
 # SHAI.PRO ИНТЕГРАЦИЯ
@@ -738,10 +704,8 @@ def send_to_shai_pro(text, user, chat, category=None):
             if len(answer) > 4096:
                 answer = answer[:4090] + "..."
             
-            # Сохраняем диалог в БД
             save_conversation(user.id, text, answer, category)
             
-            # Кнопка возврата к меню
             student = get_student_by_id(user.id)
             language = student.get('user_language', 'ru') if student else 'ru'
             markup = types.InlineKeyboardMarkup()
@@ -749,15 +713,12 @@ def send_to_shai_pro(text, user, chat, category=None):
             
             bot.send_message(chat.id, answer, reply_markup=markup)
             
-            # Отправляем отчет в админскую группу
             send_conversation_report(user, text, answer, category)
             
         else:
-            logging.error(f"Shai.pro error: {response.status_code} - {response.text}")
             bot.send_message(chat.id, f"Произошла ошибка обработки запроса. Код: {response.status_code}")
             
     except requests.Timeout:
-        logging.error("Shai.pro request timeout")
         bot.send_message(chat.id, "Превышено время ожидания ответа. Попробуйте еще раз.")
     except Exception as e:
         logging.error(f"Shai.pro request error: {e}")
@@ -846,20 +807,6 @@ def send_profile_to_admin(profile):
     except Exception as e:
         logging.error(f"Ошибка отправки профиля админам: {e}")
 
-# АДМИНСКИЕ КОМАНДЫ
-@bot.callback_query_handler(func=lambda call: call.data.startswith('admin_'))
-def handle_admin_commands(call):
-    if call.from_user.id not in ADMIN_IDS:
-        bot.answer_callback_query(call.id, "❌ Нет доступа")
-        return
-    
-    bot.answer_callback_query(call.id)
-    
-    if call.data == "admin_stats":
-        show_statistics(call.message)
-    elif call.data == "admin_list":
-        show_students_list(call.message)
-
 def show_statistics(message):
     conn = get_db_connection()
     if not conn:
@@ -872,14 +819,12 @@ def show_statistics(message):
     try:
         cursor = conn.cursor()
         
-        # Общая статистика
         cursor.execute("SELECT COUNT(*) FROM students WHERE profile_completed = TRUE")
         total_students = cursor.fetchone()[0]
         
         cursor.execute("SELECT COUNT(*) FROM conversations")
         total_conversations = cursor.fetchone()[0]
         
-        # По курсам
         cursor.execute("SELECT user_course, COUNT(*) FROM students WHERE profile_completed = TRUE GROUP BY user_course ORDER BY user_course")
         courses_stats = cursor.fetchall()
         
@@ -910,59 +855,6 @@ def show_statistics(message):
         except:
             bot.send_message(message.chat.id, "❌ Ошибка получения статистики")
 
-def show_students_list(message):
-    conn = get_db_connection()
-    if not conn:
-        try:
-            bot.edit_message_text("❌ Ошибка подключения к БД", message.chat.id, message.message_id)
-        except:
-            bot.send_message(message.chat.id, "❌ Ошибка подключения к БД")
-        return
-    
-    try:
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT telegram_id, telegram_first_name, telegram_last_name, 
-                   telegram_username, user_course, user_specialty, registration_date
-            FROM students 
-            WHERE profile_completed = TRUE 
-            ORDER BY registration_date DESC 
-            LIMIT 10
-        ''')
-        students = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        
-        if not students:
-            text = "📝 Нет зарегистрированных студентов"
-        else:
-            text = "👥 Последние 10 студентов:\n\n"
-            
-            for i, student in enumerate(students, 1):
-                name = f"{student[1] or ''} {student[2] or ''}".strip()
-                username = f"@{student[3]}" if student[3] else "без username"
-                
-                text += f"{i}. {name or 'Без имени'}\n"
-                text += f"   ID: {student[0]}\n"
-                text += f"   {username}\n"
-                text += f"   Курс: {student[4] or '?'}, {student[5] or 'Не указано'}\n"
-                text += f"   Регистрация: {student[6].strftime('%d.%m.%Y')}\n\n"
-        
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🔙 Назад", callback_data="admin_back"))
-        
-        try:
-            bot.edit_message_text(text, message.chat.id, message.message_id, reply_markup=markup)
-        except:
-            bot.send_message(message.chat.id, text, reply_markup=markup)
-            
-    except Exception as e:
-        logging.error(f"Error showing students list: {e}")
-        try:
-            bot.edit_message_text("❌ Ошибка получения списка", message.chat.id, message.message_id)
-        except:
-            bot.send_message(message.chat.id, "❌ Ошибка получения списка")
-
 @bot.callback_query_handler(func=lambda call: call.data == "admin_back")
 def admin_back(call):
     if call.from_user.id not in ADMIN_IDS:
@@ -972,27 +864,16 @@ def admin_back(call):
     
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(types.InlineKeyboardButton("📊 Статистика", callback_data="admin_stats"))
-    markup.add(types.InlineKeyboardButton("👥 Список студентов", callback_data="admin_list"))
     
     try:
         bot.edit_message_text("🛠️ Админская панель:", call.message.chat.id, call.message.message_id, reply_markup=markup)
     except:
         bot.send_message(call.message.chat.id, "🛠️ Админская панель:", reply_markup=markup)
 
-# ОБРАБОТКА ОШИБОК
-@bot.middleware_handler(update_types=['message'])
-def error_middleware(bot_instance, message):
-    try:
-        return True
-    except Exception as e:
-        logging.error(f"Middleware error: {e}")
-        return True
-
 # ИНИЦИАЛИЗАЦИЯ И ЗАПУСК
 if __name__ == "__main__":
     logging.info("Starting bot initialization...")
     
-    # Проверяем переменные окружения
     required_vars = ['PGHOST', 'PGDATABASE', 'PGUSER', 'PGPASSWORD']
     missing_vars = [var for var in required_vars if not os.environ.get(var)]
     
@@ -1002,7 +883,6 @@ if __name__ == "__main__":
     else:
         logging.info("Environment variables found")
         
-        # Инициализируем базу данных
         if init_database():
             logging.info("Bot started successfully")
             try:
