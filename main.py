@@ -99,7 +99,6 @@ def send_to_shai_pro(text, user, chat):
     'query': text,
     'response_mode': 'blocking',
     'user': str(user.id),
-    'conversation_id': f"telegram_{chat.id}"  # Добавьте эту строку
 }
     
     try:
