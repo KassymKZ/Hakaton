@@ -543,9 +543,13 @@ def handle_housing_selection(call):
         logging.info(f"Profile saved for user {user_id}")
         send_profile_to_admin(temp_profiles[user_id])
     
-    user_states[user_id] = UserState.COMPLETED
-    
+    # ВАЖНО: Очищаем состояние после завершения регистрации
     language = temp_profiles[user_id].get('user_language', 'ru')
+    if user_id in user_states:
+        del user_states[user_id]
+    if user_id in temp_profiles:
+        del temp_profiles[user_id]
+    
     markup = create_category_menu(language)
     
     bot.edit_message_text(
@@ -620,6 +624,7 @@ def handle_message(message):
     logging.info(f"Message from user {user_id}: '{message.text}'")
     logging.info(f"User state: {user_states.get(user_id, 'None')}")
     
+    # Проверяем состояние пользователя
     if user_id in user_states:
         state = user_states[user_id]
         
@@ -660,19 +665,33 @@ def handle_message(message):
                 bot.reply_to(message, "Ошибка. Начните заново с /start")
         
         else:
-            bot.reply_to(message, "Пожалуйста, используйте кнопки для выбора")
+            # Для других состояний регистрации - требуют кнопки
+            if state in [UserState.LANGUAGE, UserState.GENDER, UserState.BIRTHPLACE, UserState.FAMILY, UserState.COURSE, UserState.HOUSING]:
+                bot.reply_to(message, "Пожалуйста, используйте кнопки для выбора")
+            else:
+                # Неизвестное состояние - очищаем и перезапускаем
+                if user_id in user_states:
+                    del user_states[user_id]
+                if user_id in temp_profiles:
+                    del temp_profiles[user_id]
+                start_command(message)
+        return
     
+    # Пользователь НЕ в процессе регистрации
+    student = get_student_by_id(user_id)
+    
+    if student and student.get('profile_completed'):
+        logging.info(f"User {user_id} is registered, sending question to SHAI.PRO")
+        # Пользователь зарегистрирован - отправляем вопрос в SHAI.PRO
+        send_to_shai_pro(message.text, message.from_user, message.chat)
     else:
-        student = get_student_by_id(user_id)
-        
-        if student and student.get('profile_completed'):
-            send_to_shai_pro(message.text, message.from_user, message.chat)
-        else:
-            start_command(message)
+        logging.info(f"User {user_id} is not registered, starting registration")
+        # Пользователь не зарегистрирован - начинаем регистрацию
+        start_command(message)
 
 # SHAI.PRO ИНТЕГРАЦИЯ
 def send_to_shai_pro(text, user, chat, category=None):
-    logging.info(f"Sending to shai.pro: {text[:50]}... from user {user.id}")
+    logging.info(f"send_to_shai_pro called: user={user.id}, text='{text[:50]}...', category={category}")
     
     headers = {
         'Authorization': 'Bearer app-LqQKmr2WcmFUTAjZk2adM46j',
@@ -687,6 +706,7 @@ def send_to_shai_pro(text, user, chat, category=None):
     }
     
     try:
+        logging.info("Sending request to SHAI.PRO...")
         response = requests.post('https://hackathon.shai.pro/v1/chat-messages', 
                                json=data, headers=headers, timeout=30)
         
@@ -704,19 +724,20 @@ def send_to_shai_pro(text, user, chat, category=None):
             
             save_conversation(user.id, text, answer, category)
             
-            student = get_student_by_id(user.id)
-            language = student.get('user_language', 'ru') if student else 'ru'
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("🔙 Назад к меню", callback_data="back_to_menu"))
             
+            logging.info(f"Sending answer to user {user.id}")
             bot.send_message(chat.id, answer, reply_markup=markup)
             
             send_conversation_report(user, text, answer, category)
             
         else:
+            logging.error(f"SHAI.PRO error: {response.status_code}, {response.text}")
             bot.send_message(chat.id, f"Произошла ошибка обработки запроса. Код: {response.status_code}")
             
     except requests.Timeout:
+        logging.error("SHAI.PRO timeout")
         bot.send_message(chat.id, "Превышено время ожидания ответа. Попробуйте еще раз.")
     except Exception as e:
         logging.error(f"Shai.pro request error: {e}")
@@ -724,8 +745,11 @@ def send_to_shai_pro(text, user, chat, category=None):
 
 def send_conversation_report(user, question, answer, category):
     try:
+        logging.info(f"Attempting to send conversation report for user {user.id} to group {ADMIN_GROUP_ID}")
+        
         student = get_student_by_id(user.id)
         if not student:
+            logging.warning(f"No student found for user {user.id}")
             return
             
         category_names = {
@@ -758,9 +782,11 @@ def send_conversation_report(user, question, answer, category):
 """
         
         bot.send_message(ADMIN_GROUP_ID, report)
+        logging.info("Conversation report sent to admin group successfully")
         
     except Exception as e:
-        logging.error(f"Ошибка отправки отчета: {e}")
+        logging.error(f"Error sending conversation report to group {ADMIN_GROUP_ID}: {e}")
+
 
 def send_profile_to_admin(profile):
     try:
@@ -800,10 +826,10 @@ def send_profile_to_admin(profile):
 """
         
         bot.send_message(ADMIN_GROUP_ID, report)
-        logging.info("Profile report sent to admin group")
+        logging.info("Profile report sent to admin group successfully")
         
     except Exception as e:
-        logging.error(f"Ошибка отправки профиля админам: {e}")
+        logging.error(f"Error sending profile report to group {ADMIN_GROUP_ID}: {e}")
 
 def show_statistics(message):
     conn = get_db_connection()
