@@ -42,25 +42,17 @@ class AdminState:
 # Подключение к базе данных
 def get_db_connection():
     try:
-        # Отладочная информация
-        logging.info(f"PGHOST: {os.environ.get('PGHOST')}")
-        logging.info(f"PGDATABASE: {os.environ.get('PGDATABASE')}")
-        logging.info(f"PGUSER: {os.environ.get('PGUSER')}")
-        logging.info(f"DATABASE_URL exists: {bool(os.environ.get('DATABASE_URL'))}")
+        database_url = os.environ.get('DATABASE_URL')
         
-        db_config = {
-            'host': os.environ.get('PGHOST'),
-            'port': os.environ.get('PGPORT', 5432),
-            'database': os.environ.get('PGDATABASE'),
-            'user': os.environ.get('PGUSER'),
-            'password': os.environ.get('PGPASSWORD')
-        }
-        
-        logging.info(f"Attempting DB connection to {db_config['host']}:{db_config['port']}")
-        
-        conn = psycopg2.connect(**db_config)
-        logging.info("Database connection established successfully")
-        return conn
+        if database_url:
+            logging.info("Connecting to database via DATABASE_URL")
+            conn = psycopg2.connect(database_url)
+            logging.info("Database connection established successfully")
+            return conn
+        else:
+            logging.error("DATABASE_URL not found in environment variables")
+            return None
+            
     except Exception as e:
         logging.error(f"Database connection error: {e}")
         return None
@@ -880,14 +872,12 @@ def admin_back(call):
 if __name__ == "__main__":
     logging.info("Starting bot initialization...")
     
-    required_vars = ['PGHOST', 'PGDATABASE', 'PGUSER', 'PGPASSWORD']
-    missing_vars = [var for var in required_vars if not os.environ.get(var)]
-    
-    if missing_vars:
-        logging.error(f"Missing environment variables: {missing_vars}")
+    # Проверяем DATABASE_URL вместо отдельных переменных
+    if not os.environ.get('DATABASE_URL'):
+        logging.error("DATABASE_URL not found")
         logging.error("Bot cannot start without database configuration")
     else:
-        logging.info("Environment variables found")
+        logging.info("DATABASE_URL found")
         
         if init_database():
             logging.info("Bot started successfully")
