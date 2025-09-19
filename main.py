@@ -10,20 +10,14 @@ ADMIN_GROUP_ID = "-4940285744"
 ADMIN_IDS = [824360574]
 
 def create_category_menu():
-    """Создает меню с категориями проблем"""
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton("💰 Финансовые проблемы", callback_data="finance"),
-        types.InlineKeyboardButton("📚 Учебные трудности", callback_data="study")
-    )
-    markup.add(
-        types.InlineKeyboardButton("😰 Социальные страхи", callback_data="social"),
-        types.InlineKeyboardButton("👨‍👩‍👧‍👦 Семья и окружение", callback_data="family")
-    )
-    markup.add(
-        types.InlineKeyboardButton("🏠 Бытовые проблемы", callback_data="household"),
-        types.InlineKeyboardButton("🎯 Профориентация", callback_data="career")
-    )
+    """Создает меню с категориями проблем в одну колонку"""
+    markup = types.InlineKeyboardMarkup(row_width=1)  # row_width=1 для одной колонки
+    markup.add(types.InlineKeyboardButton("💰 Финансовые проблемы", callback_data="finance"))
+    markup.add(types.InlineKeyboardButton("📚 Учебные трудности", callback_data="study"))
+    markup.add(types.InlineKeyboardButton("😰 Социальные страхи", callback_data="social"))
+    markup.add(types.InlineKeyboardButton("👨‍👩‍👧‍👦 Семья и окружение", callback_data="family"))
+    markup.add(types.InlineKeyboardButton("🏠 Бытовые проблемы", callback_data="household"))
+    markup.add(types.InlineKeyboardButton("🎯 Профориентация", callback_data="career"))
     return markup
 
 @bot.message_handler(commands=['start', 'menu', 'categories'])
