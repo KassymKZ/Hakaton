@@ -6,12 +6,12 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 bot = telebot.TeleBot('7567419832:AAGv0eE9K7bAuOMMzv_F8SskyAb4Qcj-tG0')
-ADMIN_GROUP_ID = "-4940285744"
+ADMIN_GROUP_ID = "ВАШ_ID_ГРУППЫ"
 ADMIN_IDS = [824360574]
 
 def create_category_menu():
     """Создает меню с категориями проблем в одну колонку"""
-    markup = types.InlineKeyboardMarkup(row_width=1)  # row_width=1 для одной колонки
+    markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(types.InlineKeyboardButton("💰 Финансовые проблемы", callback_data="finance"))
     markup.add(types.InlineKeyboardButton("📚 Учебные трудности", callback_data="study"))
     markup.add(types.InlineKeyboardButton("😰 Социальные страхи", callback_data="social"))
@@ -22,19 +22,28 @@ def create_category_menu():
 
 @bot.message_handler(commands=['start', 'menu', 'categories'])
 def show_categories(message):
-    """Показывает категории проблем - НЕ отправляется в shai.pro"""
+    """Показывает категории проблем"""
     markup = create_category_menu()
     text = """Выберите категорию, которая лучше всего описывает вашу ситуацию:
 
 Я помогу вам найти подходящие решения и рекомендации."""
     
     bot.reply_to(message, text, reply_markup=markup)
-    # НЕ вызываем handle_message для команд меню
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_category_selection(call):
     """Обработка выбора категории"""
     bot.answer_callback_query(call.id)
+    
+    if call.data == "back_to_menu":
+        markup = create_category_menu()
+        bot.edit_message_text(
+            "Выберите категорию проблемы:",
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=markup
+        )
+        return
     
     # Соответствие кнопок и сообщений для классификатора
     category_messages = {
@@ -46,53 +55,38 @@ def handle_category_selection(call):
         "career": "У меня вопросы по профориентации и выбору карьеры"
     }
     
+    category_names = {
+        "finance": "Финансовые проблемы",
+        "study": "Учебные трудности",
+        "social": "Социальные страхи", 
+        "family": "Семья и окружение",
+        "household": "Бытовые проблемы",
+        "career": "Профориентация"
+    }
+    
     if call.data in category_messages:
-        # Создаем объект сообщения для отправки в shai.pro
-        fake_message = type('obj', (object,), {
-            'text': category_messages[call.data],
-            'from_user': call.from_user,
-            'chat': call.message.chat,
-            'message_id': call.message.message_id
-        })
-        
         # Уведомляем о выборе
-        category_names = {
-            "finance": "Финансовые проблемы",
-            "study": "Учебные трудности",
-            "social": "Социальные страхи", 
-            "family": "Семья и окружение",
-            "household": "Бытовые проблемы",
-            "career": "Профориентация"
-        }
-        
         bot.edit_message_text(
             f"Вы выбрали: {category_names[call.data]}\n\nОбрабатываю ваш запрос...",
             call.message.chat.id,
             call.message.message_id
         )
         
-        # Теперь отправляем в shai.pro
-        handle_message(fake_message)
+        # Напрямую отправляем запрос в shai.pro
+        send_to_shai_pro(category_messages[call.data], call.from_user, call.message.chat)
 
-@bot.message_handler(func=lambda message: True)
-def handle_message(message):
-    """Основная обработка сообщений"""
-    
-    # Проверяем, что это не команда меню
-    if message.text.startswith('/menu') or message.text.startswith('/start') or message.text.startswith('/categories'):
-        # Эти команды уже обработаны выше, не отправляем в shai.pro
-        return
-    
+def send_to_shai_pro(text, user, chat):
+    """Отправляет запрос в shai.pro"""
     # Дублируем сообщение админам
     try:
-        user_name = message.from_user.first_name
-        if message.from_user.username:
-            user_name += f" (@{message.from_user.username})"
+        user_name = user.first_name
+        if user.username:
+            user_name += f" (@{user.username})"
         
-        admin_msg = f"Входящее от {user_name}: {message.text}"
+        admin_msg = f"Входящее от {user_name}: {text}"
         bot.send_message(ADMIN_GROUP_ID, admin_msg)
-    except:
-        pass
+    except Exception as e:
+        logging.error(f"Ошибка отправки админам: {e}")
     
     # Отправляем запрос в shai.pro
     headers = {
@@ -102,14 +96,17 @@ def handle_message(message):
     
     data = {
         'inputs': {},
-        'query': message.text,
+        'query': text,
         'response_mode': 'blocking',
-        'user': str(message.from_user.id)
+        'user': str(user.id)
     }
     
     try:
         response = requests.post('https://hackathon.shai.pro/v1/chat-messages', 
                                json=data, headers=headers, timeout=30)
+        
+        logging.info(f"Status: {response.status_code}")
+        logging.info(f"Response: {response.text}")
         
         if response.status_code == 200:
             result = response.json()
@@ -119,30 +116,32 @@ def handle_message(message):
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("📋 Выбрать другую категорию", callback_data="back_to_menu"))
             
-            bot.reply_to(message, answer, reply_markup=markup)
+            bot.send_message(chat.id, answer, reply_markup=markup)
             
             # Дублируем ответ админам
             try:
+                user_name = user.first_name
+                if user.username:
+                    user_name += f" (@{user.username})"
                 bot.send_message(ADMIN_GROUP_ID, f"Ответ для {user_name}: {answer}")
             except:
                 pass
         else:
-            bot.reply_to(message, "Извините, произошла ошибка")
+            bot.send_message(chat.id, f"Ошибка API: {response.status_code}")
             
     except Exception as e:
-        logging.error(f"Ошибка: {e}")
-        bot.reply_to(message, "Техническая ошибка")
+        logging.error(f"Ошибка запроса: {e}")
+        bot.send_message(chat.id, f"Техническая ошибка: {str(e)}")
 
-# Обработка возврата к меню
-@bot.callback_query_handler(func=lambda call: call.data == "back_to_menu")
-def back_to_menu(call):
-    bot.answer_callback_query(call.id)
-    markup = create_category_menu()
-    bot.edit_message_text(
-        "Выберите категорию проблемы:",
-        call.message.chat.id,
-        call.message.message_id,
-        reply_markup=markup
-    )
+@bot.message_handler(func=lambda message: True)
+def handle_message(message):
+    """Основная обработка сообщений"""
+    
+    # Проверяем, что это не команда меню
+    if message.text.startswith('/menu') or message.text.startswith('/start') or message.text.startswith('/categories'):
+        return
+    
+    # Отправляем в shai.pro
+    send_to_shai_pro(message.text, message.from_user, message.chat)
 
 bot.polling()
