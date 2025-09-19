@@ -42,6 +42,12 @@ class AdminState:
 # Подключение к базе данных
 def get_db_connection():
     try:
+        # Отладочная информация
+        logging.info(f"PGHOST: {os.environ.get('PGHOST')}")
+        logging.info(f"PGDATABASE: {os.environ.get('PGDATABASE')}")
+        logging.info(f"PGUSER: {os.environ.get('PGUSER')}")
+        logging.info(f"DATABASE_URL exists: {bool(os.environ.get('DATABASE_URL'))}")
+        
         db_config = {
             'host': os.environ.get('PGHOST'),
             'port': os.environ.get('PGPORT', 5432),
