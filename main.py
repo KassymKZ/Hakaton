@@ -658,7 +658,6 @@ def handle_housing_selection(call):
     
     user_states[user_id] = UserState.COMPLETED
     
-    # ИСПРАВЛЕНИЕ: правильно получаем язык и создаем markup
     language = temp_profiles[user_id].get('user_language', 'ru')
     markup = create_category_menu(language)
     
@@ -741,7 +740,10 @@ def handle_admin_commands(call):
 def show_detailed_statistics(message):
     conn = get_db_connection()
     if not conn:
-        bot.edit_message_text("Ошибка подключения к БД", message.chat.id, message.message_id)
+        try:
+            bot.edit_message_text("❌ Ошибка подключения к БД", message.chat.id, message.message_id)
+        except:
+            bot.send_message(message.chat.id, "❌ Ошибка подключения к БД")
         return
     
     try:
@@ -841,16 +843,25 @@ def show_detailed_statistics(message):
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🔙 Назад", callback_data="admin_back"))
         
-        bot.edit_message_text(text, message.chat.id, message.message_id, reply_markup=markup)
+        try:
+            bot.edit_message_text(text, message.chat.id, message.message_id, reply_markup=markup)
+        except:
+            bot.send_message(message.chat.id, text, reply_markup=markup)
         
     except Exception as e:
         logging.error(f"Error in detailed stats: {e}")
-        bot.edit_message_text("Ошибка получения статистики", message.chat.id, message.message_id)
+        try:
+            bot.edit_message_text("❌ Ошибка получения статистики", message.chat.id, message.message_id)
+        except:
+            bot.send_message(message.chat.id, "❌ Ошибка получения статистики")
 
 def show_users_list(message, page=1):
     conn = get_db_connection()
     if not conn:
-        bot.edit_message_text("Ошибка подключения к БД", message.chat.id, message.message_id)
+        try:
+            bot.edit_message_text("❌ Ошибка подключения к БД", message.chat.id, message.message_id)
+        except:
+            bot.send_message(message.chat.id, "❌ Ошибка подключения к БД")
         return
     
     try:
@@ -907,24 +918,34 @@ def show_users_list(message, page=1):
         
         markup.add(types.InlineKeyboardButton("🔙 Назад", callback_data="admin_back"))
         
-        bot.edit_message_text(text, message.chat.id, message.message_id, reply_markup=markup)
+        try:
+            bot.edit_message_text(text, message.chat.id, message.message_id, reply_markup=markup)
+        except:
+            bot.send_message(message.chat.id, text, reply_markup=markup)
         
     except Exception as e:
         logging.error(f"Error in users list: {e}")
-        bot.edit_message_text("Ошибка получения списка", message.chat.id, message.message_id)
+        try:
+            bot.edit_message_text("❌ Ошибка получения списка", message.chat.id, message.message_id)
+        except:
+            bot.send_message(message.chat.id, "❌ Ошибка получения списка")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('users_page_'))
 def handle_users_pagination(call):
     if call.from_user.id not in ADMIN_IDS:
         return
     
+    bot.answer_callback_query(call.id)
     page = int(call.data.split('_')[-1])
     show_users_list(call.message, page)
 
 def show_conversations_history(message):
     conn = get_db_connection()
     if not conn:
-        bot.edit_message_text("Ошибка подключения к БД", message.chat.id, message.message_id)
+        try:
+            bot.edit_message_text("❌ Ошибка подключения к БД", message.chat.id, message.message_id)
+        except:
+            bot.send_message(message.chat.id, "❌ Ошибка подключения к БД")
         return
     
     try:
@@ -964,11 +985,17 @@ def show_conversations_history(message):
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🔙 Назад", callback_data="admin_back"))
         
-        bot.edit_message_text(text, message.chat.id, message.message_id, reply_markup=markup)
+        try:
+            bot.edit_message_text(text, message.chat.id, message.message_id, reply_markup=markup)
+        except:
+            bot.send_message(message.chat.id, text, reply_markup=markup)
         
     except Exception as e:
         logging.error(f"Error in conversations history: {e}")
-        bot.edit_message_text("Ошибка получения истории", message.chat.id, message.message_id)
+        try:
+            bot.edit_message_text("❌ Ошибка получения истории", message.chat.id, message.message_id)
+        except:
+            bot.send_message(message.chat.id, "❌ Ошибка получения истории")
 
 # ОБРАБОТКА ОТВЕТОВ АДМИНОВ
 @bot.message_handler(func=lambda message: message.text and message.text.startswith('/reply_') and message.from_user.id in ADMIN_IDS)
@@ -996,7 +1023,6 @@ def handle_message(message):
     if user_id in ADMIN_IDS and user_id in admin_states and admin_states[user_id] == AdminState.REPLYING:
         target_user_id = reply_contexts.get(user_id)
         if target_user_id:
-            # Отправляем сообщение пользователю
             try:
                 bot.send_message(target_user_id, f"📩 Сообщение от поддержки:\n\n{message.text}")
                 
@@ -1008,17 +1034,18 @@ def handle_message(message):
                 
                 # Очищаем состояние
                 admin_states[user_id] = AdminState.IDLE
-                del reply_contexts[user_id]
+                if user_id in reply_contexts:
+                    del reply_contexts[user_id]
                 
             except Exception as e:
                 bot.reply_to(message, f"❌ Ошибка отправки: {e}")
         return
     
     logging.info(f"Message from user {user_id}: '{message.text}'")
+    logging.info(f"User state: {user_states.get(user_id, 'None')}")
     
     # Проверяем, отвечает ли пользователь на сообщение поддержки
     if user_id not in user_states and message.reply_to_message and "Сообщение от поддержки" in message.reply_to_message.text:
-        # Отправляем ответ в админскую группу
         student = get_student_by_id(user_id)
         if student:
             name = "Анонимный пользователь" if student.get('is_anonymous') else (student.get('preferred_name') or "Без имени")
@@ -1035,30 +1062,41 @@ def handle_message(message):
 
 ━━━━━━━━━━━━━━━━━━
 """
-            bot.send_message(ADMIN_GROUP_ID, admin_notification)
+            try:
+                bot.send_message(ADMIN_GROUP_ID, admin_notification)
+                logging.info(f"Admin notification sent for user {user_id}")
+            except Exception as e:
+                logging.error(f"Error sending admin notification: {e}")
         return
     
-    # Обычная обработка сообщений
+    # Обработка состояний регистрации
     if user_id in user_states:
         state = user_states[user_id]
         
         if state == UserState.PREFERRED_NAME:
-            temp_profiles[user_id]['preferred_name'] = message.text
-            user_states[user_id] = UserState.AGE
-            
-            language = temp_profiles[user_id].get('user_language', 'ru')
-            bot.reply_to(message, get_text(language, 'age_request'))
-            
+            if user_id in temp_profiles and not temp_profiles[user_id].get('is_anonymous', False):
+                temp_profiles[user_id]['preferred_name'] = message.text
+                user_states[user_id] = UserState.AGE
+                
+                language = temp_profiles[user_id].get('user_language', 'ru')
+                bot.reply_to(message, get_text(language, 'age_request'))
+            else:
+                language = temp_profiles.get(user_id, {}).get('user_language', 'ru')
+                bot.reply_to(message, "Пожалуйста, используйте кнопки для выбора")
+                
         elif state == UserState.AGE:
             try:
                 age = int(message.text.strip())
                 if 16 <= age <= 35:
-                    temp_profiles[user_id]['user_age'] = age
-                    user_states[user_id] = UserState.GENDER
-                    
-                    language = temp_profiles[user_id].get('user_language', 'ru')
-                    markup = create_gender_menu(language)
-                    bot.reply_to(message, get_text(language, 'gender_request'), reply_markup=markup)
+                    if user_id in temp_profiles:
+                        temp_profiles[user_id]['user_age'] = age
+                        user_states[user_id] = UserState.GENDER
+                        
+                        language = temp_profiles[user_id].get('user_language', 'ru')
+                        markup = create_gender_menu(language)
+                        bot.reply_to(message, get_text(language, 'gender_request'), reply_markup=markup)
+                    else:
+                        bot.reply_to(message, "Ошибка. Начните заново с /start")
                 else:
                     language = temp_profiles.get(user_id, {}).get('user_language', 'ru')
                     bot.reply_to(message, get_text(language, 'age_invalid'))
@@ -1067,17 +1105,31 @@ def handle_message(message):
                 bot.reply_to(message, get_text(language, 'age_invalid'))
                 
         elif state == UserState.SPECIALTY:
-            temp_profiles[user_id]['user_specialty'] = message.text
-            user_states[user_id] = UserState.HOUSING
-            
-            language = temp_profiles[user_id].get('user_language', 'ru')
-            markup = create_housing_menu(language)
-            bot.reply_to(message, get_text(language, 'housing_request'), reply_markup=markup)
+            if user_id in temp_profiles:
+                temp_profiles[user_id]['user_specialty'] = message.text
+                user_states[user_id] = UserState.HOUSING
+                
+                language = temp_profiles[user_id].get('user_language', 'ru')
+                markup = create_housing_menu(language)
+                bot.reply_to(message, get_text(language, 'housing_request'), reply_markup=markup)
+            else:
+                bot.reply_to(message, "Ошибка. Начните заново с /start")
         
         else:
-            bot.reply_to(message, "Пожалуйста, используйте кнопки для выбора")
+            # Для всех остальных состояний, которые требуют кнопок
+            language = temp_profiles.get(user_id, {}).get('user_language', 'ru')
+            if state in [UserState.LANGUAGE, UserState.GENDER, UserState.BIRTHPLACE, UserState.FAMILY, UserState.COURSE, UserState.HOUSING]:
+                bot.reply_to(message, "Пожалуйста, используйте кнопки для выбора")
+            else:
+                # Если пользователь завершил регистрацию
+                student = get_student_by_id(user_id)
+                if student and student.get('profile_completed'):
+                    send_to_shai_pro(message.text, message.from_user, message.chat)
+                else:
+                    start_command(message)
     
     else:
+        # Пользователь не в процессе регистрации
         student = get_student_by_id(user_id)
         
         if student and student.get('profile_completed'):
@@ -1085,7 +1137,7 @@ def handle_message(message):
         else:
             start_command(message)
 
-# SHAI.PRO ИНТЕГРАЦИЯ (остается без изменений)
+# SHAI.PRO ИНТЕГРАЦИЯ
 def send_to_shai_pro(text, user, chat, category=None):
     logging.info(f"Sending to shai.pro: {text[:50]}... from user {user.id}")
     
@@ -1105,6 +1157,8 @@ def send_to_shai_pro(text, user, chat, category=None):
         response = requests.post('https://hackathon.shai.pro/v1/chat-messages', 
                                json=data, headers=headers, timeout=30)
         
+        logging.info(f"Shai.pro response status: {response.status_code}")
+        
         if response.status_code == 200:
             result = response.json()
             answer = result.get('answer', '')
@@ -1117,8 +1171,6 @@ def send_to_shai_pro(text, user, chat, category=None):
             
             save_conversation(user.id, text, answer, category)
             
-            student = get_student_by_id(user.id)
-            language = student.get('user_language', 'ru') if student else 'ru'
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("🔙 Назад к меню", callback_data="back_to_menu"))
             
@@ -1136,8 +1188,11 @@ def send_to_shai_pro(text, user, chat, category=None):
 
 def send_conversation_report(user, question, answer, category):
     try:
+        logging.info(f"Attempting to send conversation report for user {user.id}")
+        
         student = get_student_by_id(user.id)
         if not student:
+            logging.warning(f"No student found for user {user.id}")
             return
             
         if student.get('is_anonymous'):
@@ -1173,12 +1228,15 @@ def send_conversation_report(user, question, answer, category):
 """
         
         bot.send_message(ADMIN_GROUP_ID, report)
+        logging.info("Conversation report sent to admin group successfully")
         
     except Exception as e:
         logging.error(f"Ошибка отправки отчета: {e}")
 
 def send_profile_to_admin(profile):
     try:
+        logging.info(f"Attempting to send profile to admin group for user {profile.get('telegram_id')}")
+        
         region_names = {
             'astana': 'Город Астана', 'almaty': 'Город Алма-Ата', 'shymkent': 'Город Шымкент',
             'abai': 'Абайская область', 'akmola': 'Акмолинская область', 'aktobe': 'Актюбинская область',
@@ -1219,6 +1277,7 @@ def send_profile_to_admin(profile):
 """
         
         bot.send_message(ADMIN_GROUP_ID, report)
+        logging.info("Profile report sent to admin group successfully")
         
     except Exception as e:
         logging.error(f"Ошибка отправки профиля админам: {e}")
@@ -1226,7 +1285,10 @@ def send_profile_to_admin(profile):
 def show_statistics(message):
     conn = get_db_connection()
     if not conn:
-        bot.edit_message_text("Ошибка подключения к БД", message.chat.id, message.message_id)
+        try:
+            bot.edit_message_text("❌ Ошибка подключения к БД", message.chat.id, message.message_id)
+        except:
+            bot.send_message(message.chat.id, "❌ Ошибка подключения к БД")
         return
     
     try:
@@ -1256,11 +1318,25 @@ def show_statistics(message):
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🔙 Назад", callback_data="admin_back"))
         
-        bot.edit_message_text(text, message.chat.id, message.message_id, reply_markup=markup)
+        try:
+            bot.edit_message_text(text, message.chat.id, message.message_id, reply_markup=markup)
+        except:
+            bot.send_message(message.chat.id, text, reply_markup=markup)
         
     except Exception as e:
         logging.error(f"Error showing statistics: {e}")
-        bot.edit_message_text("Ошибка получения статистики", message.chat.id, message.message_id)
+        try:
+            bot.edit_message_text("❌ Ошибка получения статистики", message.chat.id, message.message_id)
+        except:
+            bot.send_message(message.chat.id, "❌ Ошибка получения статистики")
+
+@bot.callback_query_handler(func=lambda call: call.data == "admin_back")
+def admin_back(call):
+    if call.from_user.id not in ADMIN_IDS:
+        return
+    
+    bot.answer_callback_query(call.id)
+    admin_command(call.message)
 
 # ИНИЦИАЛИЗАЦИЯ И ЗАПУСК
 if __name__ == "__main__":
@@ -1282,10 +1358,19 @@ if __name__ == "__main__":
         def save_conversation(telegram_id, question, answer, category=None):
             logging.info(f"Would save conversation for {telegram_id}")
 
+        def save_admin_reply(admin_id, target_user_id, admin_message):
+            logging.info(f"Would save admin reply from {admin_id} to {target_user_id}")
+            return 1
+
+        def update_admin_reply_response(reply_id, user_response):
+            logging.info(f"Would update admin reply {reply_id}")
+
         # Переопределяем глобальные функции
         globals()['save_student_profile'] = save_student_profile
         globals()['get_student_by_id'] = get_student_by_id
         globals()['save_conversation'] = save_conversation
+        globals()['save_admin_reply'] = save_admin_reply
+        globals()['update_admin_reply_response'] = update_admin_reply_response
         
         logging.info("Bot started successfully (without database)")
         try:
