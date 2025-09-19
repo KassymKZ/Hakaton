@@ -110,7 +110,15 @@ def send_to_shai_pro(text, user, chat):
         
         if response.status_code == 200:
             result = response.json()
-            answer = result.get('answer', 'Ответ получен')
+            answer = result.get('answer', '')
+            
+            # Проверяем, что ответ не пустой
+            if not answer or answer.strip() == '':
+                answer = "Извините, не смог сформировать ответ. Попробуйте переформулировать вопрос."
+            
+            # Проверяем длину ответа (Telegram не принимает слишком длинные сообщения)
+            if len(answer) > 4096:
+                answer = answer[:4090] + "..."
             
             # Добавляем кнопку возврата к меню
             markup = types.InlineKeyboardMarkup()
@@ -126,12 +134,17 @@ def send_to_shai_pro(text, user, chat):
                 bot.send_message(ADMIN_GROUP_ID, f"Ответ для {user_name}: {answer}")
             except:
                 pass
+                
+        elif response.status_code == 404:
+            bot.send_message(chat.id, "Сервис временно недоступен. Попробуйте позже.")
         else:
-            bot.send_message(chat.id, f"Ошибка API: {response.status_code}")
+            bot.send_message(chat.id, f"Произошла ошибка обработки запроса. Код: {response.status_code}")
             
+    except requests.Timeout:
+        bot.send_message(chat.id, "Превышено время ожидания ответа. Попробуйте еще раз.")
     except Exception as e:
         logging.error(f"Ошибка запроса: {e}")
-        bot.send_message(chat.id, f"Техническая ошибка: {str(e)}")
+        bot.send_message(chat.id, "Произошла техническая ошибка. Попробуйте позже или выберите другую категорию.")
 
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
