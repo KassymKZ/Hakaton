@@ -28,13 +28,14 @@ def create_category_menu():
 
 @bot.message_handler(commands=['start', 'menu', 'categories'])
 def show_categories(message):
-    """Показывает категории проблем"""
+    """Показывает категории проблем - НЕ отправляется в shai.pro"""
     markup = create_category_menu()
     text = """Выберите категорию, которая лучше всего описывает вашу ситуацию:
 
 Я помогу вам найти подходящие решения и рекомендации."""
     
     bot.reply_to(message, text, reply_markup=markup)
+    # НЕ вызываем handle_message для команд меню
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_category_selection(call):
@@ -52,7 +53,7 @@ def handle_category_selection(call):
     }
     
     if call.data in category_messages:
-        # Создаем фальшивое сообщение для отправки в shai.pro
+        # Создаем объект сообщения для отправки в shai.pro
         fake_message = type('obj', (object,), {
             'text': category_messages[call.data],
             'from_user': call.from_user,
@@ -60,7 +61,7 @@ def handle_category_selection(call):
             'message_id': call.message.message_id
         })
         
-        # Уведомляем пользователя о выборе
+        # Уведомляем о выборе
         category_names = {
             "finance": "Финансовые проблемы",
             "study": "Учебные трудности",
@@ -76,18 +77,17 @@ def handle_category_selection(call):
             call.message.message_id
         )
         
-        # Отправляем в систему shai.pro
+        # Теперь отправляем в shai.pro
         handle_message(fake_message)
 
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
     """Основная обработка сообщений"""
-    # Если сообщение не команда - добавляем кнопку возврата к категориям
-    if not message.text.startswith('/'):
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("📋 Выбрать другую категорию", callback_data="back_to_categories"))
-    else:
-        markup = None
+    
+    # Проверяем, что это не команда меню
+    if message.text.startswith('/menu') or message.text.startswith('/start') or message.text.startswith('/categories'):
+        # Эти команды уже обработаны выше, не отправляем в shai.pro
+        return
     
     # Дублируем сообщение админам
     try:
@@ -121,6 +121,10 @@ def handle_message(message):
             result = response.json()
             answer = result.get('answer', 'Ответ получен')
             
+            # Добавляем кнопку возврата к меню
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("📋 Выбрать другую категорию", callback_data="back_to_menu"))
+            
             bot.reply_to(message, answer, reply_markup=markup)
             
             # Дублируем ответ админам
@@ -129,14 +133,15 @@ def handle_message(message):
             except:
                 pass
         else:
-            bot.reply_to(message, "Извините, произошла ошибка", reply_markup=markup)
+            bot.reply_to(message, "Извините, произошла ошибка")
             
     except Exception as e:
-        bot.reply_to(message, "Техническая ошибка", reply_markup=markup)
+        logging.error(f"Ошибка: {e}")
+        bot.reply_to(message, "Техническая ошибка")
 
-# Обработка возврата к категориям
-@bot.callback_query_handler(func=lambda call: call.data == "back_to_categories")
-def back_to_categories(call):
+# Обработка возврата к меню
+@bot.callback_query_handler(func=lambda call: call.data == "back_to_menu")
+def back_to_menu(call):
     bot.answer_callback_query(call.id)
     markup = create_category_menu()
     bot.edit_message_text(
