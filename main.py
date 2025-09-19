@@ -9,6 +9,7 @@ bot = telebot.TeleBot('7567419832:AAGv0eE9K7bAuOMMzv_F8SskyAb4Qcj-tG0')
 ADMIN_GROUP_ID = "-4940285744"
 ADMIN_IDS = [824360574]
 
+# hjgihg
 def create_category_menu():
     """Создает меню с категориями проблем"""
     markup = types.InlineKeyboardMarkup(row_width=2)
