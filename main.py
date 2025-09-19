@@ -66,7 +66,7 @@ def send_admin_report(user_info, question, bot_answer, category=None):
 {question}
 
 🤖 Ответ бота:
-{bot_answer[:500]}{'...' if len(bot_answer) > 500 else ''}
+{bot_answer[:1000]}{'...' if len(bot_answer) > 1000 else ''}
 
 ━━━━━━━━━━━━━━━━━━
 """
