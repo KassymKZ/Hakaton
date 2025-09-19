@@ -869,21 +869,31 @@ def admin_back(call):
         bot.send_message(call.message.chat.id, "🛠️ Админская панель:", reply_markup=markup)
 
 # ИНИЦИАЛИЗАЦИЯ И ЗАПУСК
+# ИНИЦИАЛИЗАЦИЯ И ЗАПУСК
 if __name__ == "__main__":
     logging.info("Starting bot initialization...")
     
-    # Проверяем DATABASE_URL вместо отдельных переменных
-    if not os.environ.get('DATABASE_URL'):
-        logging.error("DATABASE_URL not found")
-        logging.error("Bot cannot start without database configuration")
-    else:
-        logging.info("DATABASE_URL found")
-        
-        if init_database():
-            logging.info("Bot started successfully")
-            try:
-                bot.polling(none_stop=True, interval=0)
-            except Exception as e:
-                logging.error(f"Polling error: {e}")
-        else:
-            logging.error("Failed to initialize database")
+    # Временно запускаем без базы данных
+    logging.info("Starting bot without database for testing...")
+    
+    # Заглушки для функций БД
+    def save_student_profile(profile_data):
+        logging.info(f"Would save profile for {profile_data.get('telegram_id')}")
+        return True
+
+    def get_student_by_id(telegram_id):
+        return None
+
+    def save_conversation(telegram_id, question, answer, category=None):
+        logging.info(f"Would save conversation for {telegram_id}")
+
+    # Переопределяем глобальные функции
+    globals()['save_student_profile'] = save_student_profile
+    globals()['get_student_by_id'] = get_student_by_id
+    globals()['save_conversation'] = save_conversation
+    
+    logging.info("Bot started successfully (without database)")
+    try:
+        bot.polling(none_stop=True, interval=0)
+    except Exception as e:
+        logging.error(f"Polling error: {e}")
